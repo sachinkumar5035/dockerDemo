@@ -1,56 +1,62 @@
 package com.example.dockerDemo.controller;
 
-import com.example.dockerDemo.model.Employee;
+import com.example.dockerDemo.dto.EmployeeRequestDto;
+import com.example.dockerDemo.dto.EmployeeResponseDto;
 import com.example.dockerDemo.services.EmployeeService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+
+import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/employees")
 public class EmployeeController {
 
-    private final EmployeeService employeeService;
+    private final EmployeeService service;
 
-    public EmployeeController(EmployeeService employeeService) {
-        this.employeeService = employeeService;
+    public EmployeeController(EmployeeService service) {
+        this.service = service;
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Employee createEmployee(
-            @RequestBody Employee employee) {
-
-        return employeeService.createEmployee(employee);
+    public EmployeeResponseDto create(
+            @Valid @RequestBody EmployeeRequestDto request) {
+        return service.create(request);
     }
 
     @GetMapping
-    public List<Employee> getAllEmployees() {
+    public Page<EmployeeResponseDto> getEmployees(
+            @RequestParam(required = false) String department,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction) {
 
-        return employeeService.getAllEmployees();
+        return service.getEmployees(
+                department, page, size, sortBy, direction
+        );
     }
 
     @GetMapping("/{id}")
-    public Employee getEmployeeById(
-            @PathVariable Long id) {
-
-        return employeeService.getEmployeeById(id);
+    public EmployeeResponseDto getById(@PathVariable Long id) {
+        return service.getById(id);
     }
 
     @PutMapping("/{id}")
-    public Employee updateEmployee(
+    public EmployeeResponseDto update(
             @PathVariable Long id,
-            @RequestBody Employee employee) {
-
-        return employeeService.updateEmployee(id, employee);
+            @Valid @RequestBody EmployeeRequestDto request) {
+        return service.update(id, request);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteEmployee(
-            @PathVariable Long id) {
-
-        employeeService.deleteEmployee(id);
+    public void delete(@PathVariable Long id) {
+        service.delete(id);
     }
+
 }

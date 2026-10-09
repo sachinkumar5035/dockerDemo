@@ -1,60 +1,123 @@
 package com.example.dockerDemo.services;
 
+import com.example.dockerDemo.dto.EmployeeRequestDto;
+import com.example.dockerDemo.dto.EmployeeResponseDto;
 import com.example.dockerDemo.exceptions.EmployeeNotFoundException;
 import com.example.dockerDemo.model.Employee;
 import com.example.dockerDemo.repository.EmployeeRepository;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+
+import org.springframework.data.domain.*;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Set;
 
 @Service
+@Transactional(readOnly = true)
 public class EmployeeServiceImpl implements EmployeeService {
 
-    private final EmployeeRepository employeeRepository;
+    private final EmployeeRepository repository;
 
-    public EmployeeServiceImpl(EmployeeRepository employeeRepository) {
-        this.employeeRepository = employeeRepository;
+    private static final Set<String> SORT_FIELDS =
+            Set.of("id", "name", "department", "salary", "email");
+
+    public EmployeeServiceImpl(EmployeeRepository repository) {
+        this.repository = repository;
     }
 
     @Override
-    public Employee createEmployee(Employee employee) {
-        return employeeRepository.save(employee);
+    @Transactional
+    public EmployeeResponseDto create(EmployeeRequestDto request) {
+        if (repository.existsByEmailIgnoreCase(request.email())) {
+            throw new IllegalArgumentException("Email already exists");
+        }
+
+        Employee employee = new Employee(
+                request.name().trim(),
+                request.email().trim(),
+                request.department().trim(),
+                request.salary()
+        );
+
+        return EmployeeResponseDto.from(repository.save(employee));
     }
 
     @Override
-    public List<Employee> getAllEmployees() {
-        return employeeRepository.findAll();
+    public Page<EmployeeResponseDto> getEmployees(
+            String department, int page, int size,
+            String sortBy, String direction) {
+
+        if (page < 0) {
+            throw new IllegalArgumentException(
+                    "Page must be zero or greater"
+            );
+        }
+
+        if (size < 1 || size > 100) {
+            throw new IllegalArgumentException(
+                    "Page size must be between 1 and 100"
+            );
+        }
+
+        if (!SORT_FIELDS.contains(sortBy)) {
+            throw new IllegalArgumentException(
+                    "Unsupported sort field: " + sortBy
+            );
+        }
+
+        Sort.Direction sortDirection =
+                Sort.Direction.fromString(direction);
+
+        Pageable pageable = PageRequest.of(
+                page, size, Sort.by(sortDirection, sortBy)
+        );
+
+        Page<Employee> employees;
+
+        if (department != null && !department.isBlank()) {
+            employees = repository.findByDepartmentIgnoreCase(department.trim(), pageable);
+        } else {
+            employees = repository.findAll(pageable);
+        }
+
+        return employees.map(EmployeeResponseDto::from);
     }
 
     @Override
-    public Employee getEmployeeById(Long id) {
-
-        return employeeRepository.findById(id)
-                .orElseThrow(() ->
-                        new EmployeeNotFoundException(
-                                "Employee not found with id: " + id
-                        ));
+    public EmployeeResponseDto getById(Long id) {
+        return EmployeeResponseDto.from(findEmployee(id));
     }
 
     @Override
-    public Employee updateEmployee(Long id,
-                                   Employee employee) {
+    @Transactional
+    public EmployeeResponseDto update(Long id, EmployeeRequestDto request) {
+        Employee employee = findEmployee(id);
 
-        Employee existingEmployee = getEmployeeById(id);
+        if (repository.existsByEmailIgnoreCaseAndIdNot(
+                request.email(), id)) {
+            throw new IllegalArgumentException("Email already exists");
+        }
 
-        existingEmployee.setName(employee.getName());
-        existingEmployee.setEmail(employee.getEmail());
-        existingEmployee.setDepartment(employee.getDepartment());
-        existingEmployee.setSalary(employee.getSalary());
+        employee.setName(request.name().trim());
+        employee.setEmail(request.email().trim());
+        employee.setDepartment(request.department().trim());
+        employee.setSalary(request.salary());
 
-        return employeeRepository.save(existingEmployee);
+        // Managed entity is updated by JPA dirty checking.
+        return EmployeeResponseDto.from(employee);
     }
 
     @Override
-    public void deleteEmployee(Long id) {
+    @Transactional
+    public void delete(Long id) {
+        repository.delete(findEmployee(id));
+    }
 
-        Employee employee = getEmployeeById(id);
-
-        employeeRepository.delete(employee);
+    private Employee findEmployee(Long id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new EmployeeNotFoundException(
+                        "Employee not found with id: " + id
+                ));
     }
 }

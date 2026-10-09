@@ -1,18 +1,22 @@
 package com.example.dockerDemo.services;
 
-import com.example.dockerDemo.model.Employee;
+import com.example.dockerDemo.dto.EmployeeRequestDto;
+import com.example.dockerDemo.dto.EmployeeResponseDto;
+import org.springframework.data.domain.Page;
 
-import java.util.List;
 
 public interface EmployeeService {
 
-    Employee createEmployee(Employee employee);
+    EmployeeResponseDto create(EmployeeRequestDto request);
 
-    List<Employee> getAllEmployees();
+    Page<EmployeeResponseDto> getEmployees(
+            String department, int page, int size,
+            String sortBy, String direction
+    );
 
-    Employee getEmployeeById(Long id);
+    EmployeeResponseDto getById(Long id);
 
-    Employee updateEmployee(Long id, Employee employee);
+    EmployeeResponseDto update(Long id, EmployeeRequestDto request);
 
-    void deleteEmployee(Long id);
+    void delete(Long id);
 }
